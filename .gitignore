@@ -1,0 +1,7 @@
+.idea
+*.csv
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+client_secret.json
+books_file
