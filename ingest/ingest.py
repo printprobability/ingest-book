@@ -1,5 +1,5 @@
 """
-Author: Chris/Nikolai
+Original Authors: Chris/Nikolai
 Hookup a book to the api by looking up its VID in database using ESTC no.
 Called from the workflow.
 """
@@ -95,6 +95,7 @@ def _get_uuid_and_post_new_data(book_data, verify, headers, printer=None):
         return uuid
 
 
+# Create the batch command to ingest the book
 def _create_bash_command(book_uuid, folder_name):
     batch_command_prefix = 'sbatch -c 4 --mem-per-cpu=1999mb -p "RM-shared" -t 48:00:00'
     activate_virtual_env = 'source activate {0}'.format(VIRTUAL_ENV_PATH)
@@ -107,6 +108,11 @@ def _create_bash_command(book_uuid, folder_name):
                 command_to_run=command_to_run)
 
 
+# Lookup printer full name from the Google sheet 'Printers' worksheet
+def _get_printer_name_from_sheet(printer_short_name):
+    get_full_printer_name_for_short_name(printer_short_name)
+
+
 def run_command(book_string, preexisting_uuid, printer):
     # Folder name is same as the book string
     folder_name = book_string
@@ -116,11 +122,8 @@ def run_command(book_string, preexisting_uuid, printer):
     # ESTC number is the second element in the split book string
     estc_no = split_book_string[1]
 
-    # Lookup printer full name from the Google sheet 'Printers' worksheet
-    printer_from_book_string = get_full_printer_name_for_short_name(split_book_string[0])
-
-    # Use printer passed as argument, default to the fullname from previous step
-    book_printer = printer if printer is not None else printer_from_book_string
+    # Use printer passed as argument, default to the fullname from Google sheet or the short-name as last default
+    book_printer = printer if printer is not None else _get_printer_name_from_sheet(split_book_string[0])
 
     # if this book already exists in our backend
     if preexisting_uuid is not None:
