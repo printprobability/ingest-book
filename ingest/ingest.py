@@ -6,8 +6,8 @@ Called from the workflow.
 import pandas as pd
 import requests
 import subprocess
-from sheets.sheet import get_full_printer_name_for_short_name, update_uuid_in_sheet_for_estc_number
-from estc_search.estc import est_info_for_number
+from .sheets.sheet import get_full_printer_name_for_short_name, update_uuid_in_sheet_for_estc_number
+from .estc_search.estc import est_info_for_number
 
 API_TOKEN_FILE_PATH = '/ocean/projects/hum160002p/shared/api/api_token.txt'
 JSON_OUTPUT_PATH = '/ocean/projects/hum160002p/shared/ocr_results/json_output'
