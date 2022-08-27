@@ -38,6 +38,6 @@ def get_full_printer_name_for_short_name(printer_short_name):
         index += 1
         if row[1] == printer_short_name:
             print('Found printer full name for short name', printer_short_name, row[0])
-            return row[0]
+            return row[0].replace('"', '')
     print("Could not find printer full name for short name - ", printer_short_name)
-    return printer_short_name
+    exit(-1)

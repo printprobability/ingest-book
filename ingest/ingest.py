@@ -4,10 +4,14 @@ Hookup a book to the api by looking up its VID in database using ESTC no.
 Called from the workflow.
 """
 from csv import DictReader
+import re
+import json
+import datetime
 import requests
 import subprocess
 from .sheets.sheet import get_full_printer_name_for_short_name, update_uuid_in_sheet_for_estc_number
 from .estc_search.estc import est_info_for_number
+from .util import confirm
 
 API_TOKEN_FILE_PATH = '/ocean/projects/hum160002p/shared/api/api_token.txt'
 JSON_OUTPUT_PATH = '/ocean/projects/hum160002p/shared/ocr_results/json_output'
@@ -17,6 +21,22 @@ CERT_PATH = '/ocean/projects/hum160002p/shared/api/incommonrsaserverca-bundle.cr
 BULK_LOAD_JSON_SCRIPT = '/ocean/projects/hum160002p/shared/api/bulk_load_json.py'
 VIRTUAL_ENV_PATH = '/ocean/projects/hum160002p/gsell/.conda/envs/my_env'
 ESTC_LOOKUP_CSV = '/ocean/projects/hum160002p/shared/api/estc_vid_lookup.csv'
+
+
+def _year_from_imprint_value(imprint_value):
+    # match 4 digit year in the input string
+    pattern_format_string = r'\d{4}'
+
+    # create the re.Pattern object use re.compile function.
+    reg_pattern = re.compile(pattern_format_string)
+
+    result = reg_pattern.search(imprint_value)
+
+    if result is None:
+        print("Error: cannot identify 'year' from ESTC Imprint value", imprint_value)
+        exit(-1)
+
+    return result.group()  # return first match
 
 
 def _load_token(path_to_token):
@@ -50,7 +70,11 @@ def _get_vid(estc_number_as_string) -> str:
 def _retrieve_metadata(vid, verify, headers):
     payload = {'vid': vid}
     r = requests.get(BOOKS_API_URL, headers=headers, params=payload, verify=verify)
-    return r.json()
+    result = r.json().get('results')
+    if result is None or len(result) == 0:
+        print('Error fetching metadata for VID -', vid)
+        return None
+    return result[0]
 
 
 def _api_headers():
@@ -62,24 +86,24 @@ def _api_headers():
 def _create_book(book, printer):
     payload = {
         # "id": None,
-        "eebo": book['eebo'],
-        "vid": book['vid'],
-        "tcp": book['tcp'],
-        "estc": book['estc'],
+        "eebo": book.get('eebo'),
+        "vid": book.get('vid'),
+        "tcp": book.get('tcp', ''),  # Default to empty if not available
+        "estc": book.get('estc'),
         "zipfile": "",
-        "pp_publisher": book['pp_publisher'],
-        "pp_author": book['pp_author'],
-        "pq_publisher": book['pq_publisher'],
-        "pq_title": book['pq_title'],
-        "pq_url": book['pq_url'],
-        "pq_author": book['pq_author'],
-        "pq_year_verbatim": book['pq_year_verbatim'],
-        "pq_year_early": book['pq_year_early'],
-        "pq_year_late": book['pq_year_late'],
-        "tx_year_early": book['tx_year_early'],
-        "tx_year_late": book['tx_year_late'],
-        "date_early": book['date_early'],
-        "date_late": book['date_late'],
+        "pp_publisher": book.get('pp_publisher'),
+        "pp_author": book.get('pp_author'),
+        "pq_publisher": book.get('pq_publisher'),
+        "pq_title": book.get('pq_title'),
+        "pq_url": book.get('pq_url', ''),  # Default to empty if not available
+        "pq_author": book.get('pq_author'),
+        "pq_year_verbatim": book.get('pq_year_verbatim'),
+        "pq_year_early": book.get('pq_year_early'),
+        "pq_year_late": book.get('pq_year_late'),
+        "tx_year_early": book.get('tx_year_early'),
+        "tx_year_late": book.get('tx_year_late'),
+        "date_early": book.get('date_early'),
+        "date_late": book.get('date_late'),
         "pdf": "",
         "starred": False,
         "ignored": False,
@@ -95,14 +119,44 @@ def _create_book(book, printer):
     return r.json()
 
 
-def _get_uuid_and_post_new_data(vid, printer=None):
-    book_metadata = _retrieve_metadata(vid, CERT_PATH, _api_headers())
-    if bool(book_metadata['results']):
-        book = book_metadata['results'][0]
-        response = _create_book(book, printer)
-        return response['id']
-    else:
-        print('Error fetching metadata for VID -', vid)
+def _get_book_data_from_estc(estc_number, printer=None):
+    estc_info = est_info_for_number(estc_number=estc_number)
+
+    # Make sure we get the right data from ESTC, otherwise fail here
+    assert estc_info.get("ESTC No.") == estc_number
+
+    publisher_info = estc_info.get('Publisher Info')
+    year = _year_from_imprint_value(publisher_info)
+    print("Using year from ESTC as - ", year)
+
+    first_day_of_year = datetime.datetime(int(year), 1, 1).strftime('%Y-%m-%d')
+    last_day_of_year = datetime.datetime(int(year), 12, 31).strftime('%Y-%m-%d')
+
+    book_metadata = {
+        'estc': estc_number,
+        'pp_publisher': publisher_info,
+        'pp_author': estc_info.get('Author'),
+        'pq_publisher': printer,
+        'pq_title': estc_info.get('Title'),
+        'pq_author': estc_info.get('Author'),
+        'pq_year_verbatim': year,
+        'pq_year_early': year,
+        'pq_year_late': year,
+        'tx_year_early': year,
+        'tx_year_late': year,
+        'date_early': first_day_of_year,
+        'date_late': last_day_of_year,
+    }
+    print('Using the following metadata to create the book - ', json.dumps(book_metadata, indent=4))
+    if not confirm('Continue with these details ?'):
+        exit(0)
+    return book_metadata
+
+
+def _get_uuid_and_post_new_data(book_metadata, printer=None):
+    response = _create_book(book_metadata, printer)
+    print('Create book response from backend - ', response)
+    return response['id']  # UUID of the book
 
 
 # Create the batch command to ingest the book
@@ -120,7 +174,7 @@ def _create_bash_command(book_uuid, folder_name):
 
 # Lookup printer full name from the Google sheet 'Printers' worksheet
 def _get_printer_name_from_sheet(printer_short_name):
-    get_full_printer_name_for_short_name(printer_short_name)
+    return get_full_printer_name_for_short_name(printer_short_name)
 
 
 def run_command(book_string, preexisting_uuid, printer):
@@ -141,9 +195,19 @@ def run_command(book_string, preexisting_uuid, printer):
     if preexisting_uuid is not None:
         print("Pre-existing UUID provided: ", preexisting_uuid)
         command = _create_bash_command(preexisting_uuid, folder_name)
-    else: # this is a new book, we need to create it first
+    else:  # this is a new book, we need to create it first
+        # VID lookup in the ESTC CSV
         vid = _get_vid(estc_no)
-        uuid = _get_uuid_and_post_new_data(vid, book_printer)
+
+        # Try to retrieve metadata from our backend
+        book_metadata = _retrieve_metadata(vid, CERT_PATH, _api_headers())
+        if vid is None or book_metadata is None:
+            print("Either VID is not present in our database or the book is not in our database.")
+            print("Trying to get book data using ESTC info lookup...")
+            book_metadata = _get_book_data_from_estc(estc_number=estc_no, printer=book_printer)
+
+        # Create book in our backend
+        uuid = _get_uuid_and_post_new_data(book_metadata, book_printer)
 
         # Update the book UUID in the Google sheet
         print("BOOK CREATED", uuid)
