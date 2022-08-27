@@ -3,7 +3,7 @@ Original Authors: Chris/Nikolai
 Hookup a book to the api by looking up its VID in database using ESTC no.
 Called from the workflow.
 """
-import pandas as pd
+from csv import DictReader
 import requests
 import subprocess
 from .sheets.sheet import get_full_printer_name_for_short_name, update_uuid_in_sheet_for_estc_number
@@ -30,18 +30,21 @@ def _build_headers(token):
     return {'Authorization': 'Token {}'.format(token)}
 
 
-def _get_vid(lookup_df, estcNo_as_string):
+def _get_vid_for_estc_number(estc_number):
+    with open(ESTC_LOOKUP_CSV) as csvfile:
+        reader = DictReader(csvfile)
+        for row in reader:
+            # check the arguments against the row
+            if row['estcNO'] == estc_number:
+                return dict(row).get('VID')
+
+
+def _get_vid(estc_number_as_string) -> str:
     try:
-        vid = lookup_df.loc[lookup_df['estcNO'] == estcNo_as_string].iloc[0]['VID']
-        print(vid)
+        vid = _get_vid_for_estc_number(estc_number=estc_number_as_string)
+        return vid
     except IndexError:
         print("It looks like that ESTC number may not be in our file?")
-
-        # Lookup ESTC info from the ESTC website for this number
-        estc_info = est_info_for_number(estcNo_as_string)
-        print("Here's what we could find from the ESTC website: ", estc_info)
-
-    return vid
 
 
 def _retrieve_metadata(vid, verify, headers):
@@ -129,8 +132,7 @@ def run_command(book_string, preexisting_uuid, printer):
     if preexisting_uuid is not None:
         command = _create_bash_command(preexisting_uuid, folder_name)
     else: # this is a new book, we need to create it first
-        lookup_df = pd.read_csv(ESTC_LOOKUP_CSV)
-        vid = _get_vid(lookup_df, estc_no)
+        vid = _get_vid(estc_no)
         token = _load_token(API_TOKEN_FILE_PATH)
         headers = _build_headers(token)
         book_data = _retrieve_metadata(vid, CERT_PATH, headers)
