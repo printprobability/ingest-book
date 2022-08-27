@@ -9,14 +9,14 @@ import subprocess
 from .sheets.sheet import get_full_printer_name_for_short_name, update_uuid_in_sheet_for_estc_number
 from .estc_search.estc import est_info_for_number
 
-API_TOKEN_FILE_PATH = '/Users/sriram/cmu/books/api_token.txt'
-JSON_OUTPUT_PATH = '/Users/sriram/cmu/books'
-BOOKS_API_URL = 'http://localhost:8080/api/books/'
+API_TOKEN_FILE_PATH = '/ocean/projects/hum160002p/shared/api/api_token.txt'
+JSON_OUTPUT_PATH = '/ocean/projects/hum160002p/shared/ocr_results/json_output'
+BOOKS_API_URL = 'https://printprobdb.psc.edu/api/books/'
 BOOKS_URL = 'https://printprobdb.psc.edu/books'
 CERT_PATH = '/ocean/projects/hum160002p/shared/api/incommonrsaserverca-bundle.crt'
 BULK_LOAD_JSON_SCRIPT = '/ocean/projects/hum160002p/shared/api/bulk_load_json.py'
 VIRTUAL_ENV_PATH = '/ocean/projects/hum160002p/gsell/.conda/envs/my_env'
-ESTC_LOOKUP_CSV = '/Users/sriram/cmu/books/estc_vid_lookup.csv'
+ESTC_LOOKUP_CSV = '/ocean/projects/hum160002p/shared/api/estc_vid_lookup.csv'
 
 
 def _load_token(path_to_token):
