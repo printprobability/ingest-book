@@ -1,6 +1,5 @@
 from bs4 import BeautifulSoup
 from functools import partial
-import pandas as pd
 import urllib.request
 from urllib.parse import parse_qs, urlencode, urlsplit
 
@@ -10,22 +9,6 @@ text_queries = ["ESTC Citation No.", "Main Title", "ME-Personal Name", "Imprint"
 
 
 def _query_html(soup: BeautifulSoup, field: str) -> str:
-    """
-    Finds all instances of single query field e.g. Author, Title etc.
-    (becomes column in DF)
-
-    Parameters
-    ----------
-    soup : BeautifulSoup
-        BeautifulSoup html parsed object
-    field: str
-        Desired search field text e.g. Publisher_year
-
-    Returns
-    -------
-    field_values : pd.Series
-        pd.Series of all desired field values consisting of future DF column
-    """
     # find all values containing query field
     all_text = soup.find_all('td', string=field)
     values = []
