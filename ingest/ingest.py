@@ -9,14 +9,14 @@ import subprocess
 from .sheets.sheet import get_full_printer_name_for_short_name, update_uuid_in_sheet_for_estc_number
 from .estc_search.estc import est_info_for_number
 
-API_TOKEN_FILE_PATH = '/ocean/projects/hum160002p/shared/api/api_token.txt'
-JSON_OUTPUT_PATH = '/ocean/projects/hum160002p/shared/ocr_results/json_output'
-BOOKS_API_URL = 'https://printprobdb.psc.edu/api/books/'
+API_TOKEN_FILE_PATH = '/Users/sriram/cmu/books/api_token.txt'
+JSON_OUTPUT_PATH = '/Users/sriram/cmu/books'
+BOOKS_API_URL = 'http://localhost:8080/api/books/'
 BOOKS_URL = 'https://printprobdb.psc.edu/books'
 CERT_PATH = '/ocean/projects/hum160002p/shared/api/incommonrsaserverca-bundle.crt'
 BULK_LOAD_JSON_SCRIPT = '/ocean/projects/hum160002p/shared/api/bulk_load_json.py'
 VIRTUAL_ENV_PATH = '/ocean/projects/hum160002p/gsell/.conda/envs/my_env'
-ESTC_LOOKUP_CSV = '/ocean/projects/hum160002p/shared/api/estc_vid_lookup.csv'
+ESTC_LOOKUP_CSV = '/Users/sriram/cmu/books/estc_vid_lookup.csv'
 
 
 def _load_token(path_to_token):
@@ -48,54 +48,61 @@ def _get_vid(estc_number_as_string) -> str:
 
 
 def _retrieve_metadata(vid, verify, headers):
-    book_data = {}
     payload = {'vid': vid}
     r = requests.get(BOOKS_API_URL, headers=headers, params=payload, verify=verify)
-    book_data[vid] = r.json()
-    return book_data
+    return r.json()
 
 
-def _get_uuid_and_post_new_data(book_data, verify, headers, printer=None):
-    responses = []
-    for key in book_data.keys():
-        if bool(book_data[key]['results']):
-            payload = {
-                # "id": None,
-                "eebo": book_data[key]['results'][0]['eebo'],
-                "vid": book_data[key]['results'][0]['vid'],
-                "tcp": book_data[key]['results'][0]['tcp'],
-                "estc": book_data[key]['results'][0]['estc'],
-                "zipfile": "",
-                "pp_publisher": book_data[key]['results'][0]['pp_publisher'],
-                "pp_author": book_data[key]['results'][0]['pp_author'],
-                "pq_publisher": book_data[key]['results'][0]['pq_publisher'],
-                "pq_title": book_data[key]['results'][0]['pq_title'],
-                "pq_url": book_data[key]['results'][0]['pq_url'],
-                "pq_author": book_data[key]['results'][0]['pq_author'],
-                "pq_year_verbatim": book_data[key]['results'][0]['pq_year_verbatim'],
-                "pq_year_early": book_data[key]['results'][0]['pq_year_early'],
-                "pq_year_late": book_data[key]['results'][0]['pq_year_late'],
-                "tx_year_early": book_data[key]['results'][0]['tx_year_early'],
-                "tx_year_late": book_data[key]['results'][0]['tx_year_late'],
-                "date_early": book_data[key]['results'][0]['date_early'],
-                "date_late": book_data[key]['results'][0]['date_late'],
-                "pdf": "",
-                "starred": False,
-                "ignored": False,
-                "is_eebo_book": False,
-                "prefix": None,
-                "repository": "",
-                "pp_printer": printer,
-                "colloq_printer": "",
-                "pp_notes": ""
-            }
-            # print(payload)
-            r = requests.post(BOOKS_API_URL, headers=headers, json=payload, verify=verify)
-            responses.append(r.json())
-        else:
-            print('problem', key)
-        uuid = responses[0]['id']
-        return uuid
+def _api_headers():
+    token = _load_token(API_TOKEN_FILE_PATH)
+    headers = _build_headers(token)
+    return headers
+
+
+def _create_book(book, printer):
+    payload = {
+        # "id": None,
+        "eebo": book['eebo'],
+        "vid": book['vid'],
+        "tcp": book['tcp'],
+        "estc": book['estc'],
+        "zipfile": "",
+        "pp_publisher": book['pp_publisher'],
+        "pp_author": book['pp_author'],
+        "pq_publisher": book['pq_publisher'],
+        "pq_title": book['pq_title'],
+        "pq_url": book['pq_url'],
+        "pq_author": book['pq_author'],
+        "pq_year_verbatim": book['pq_year_verbatim'],
+        "pq_year_early": book['pq_year_early'],
+        "pq_year_late": book['pq_year_late'],
+        "tx_year_early": book['tx_year_early'],
+        "tx_year_late": book['tx_year_late'],
+        "date_early": book['date_early'],
+        "date_late": book['date_late'],
+        "pdf": "",
+        "starred": False,
+        "ignored": False,
+        "is_eebo_book": False,
+        "prefix": None,
+        "repository": "",
+        "pp_printer": printer,
+        "colloq_printer": "",
+        "pp_notes": ""
+    }
+    # print(payload)
+    r = requests.post(BOOKS_API_URL, headers=_api_headers(), json=payload, verify=None)
+    return r.json()
+
+
+def _get_uuid_and_post_new_data(vid, printer=None):
+    book_metadata = _retrieve_metadata(vid, CERT_PATH, _api_headers())
+    if bool(book_metadata['results']):
+        book = book_metadata['results'][0]
+        response = _create_book(book, printer)
+        return response['id']
+    else:
+        print('Error fetching metadata for VID -', vid)
 
 
 # Create the batch command to ingest the book
@@ -124,19 +131,19 @@ def run_command(book_string, preexisting_uuid, printer):
 
     # ESTC number is the second element in the split book string
     estc_no = split_book_string[1]
+    print("ESTC number - ", estc_no)
 
     # Use printer passed as argument, default to the fullname from Google sheet or the short-name as last default
     book_printer = printer if printer is not None else _get_printer_name_from_sheet(split_book_string[0])
+    print("Using printer name as - ", book_printer)
 
     # if this book already exists in our backend
     if preexisting_uuid is not None:
+        print("Pre-existing UUID provided: ", preexisting_uuid)
         command = _create_bash_command(preexisting_uuid, folder_name)
     else: # this is a new book, we need to create it first
         vid = _get_vid(estc_no)
-        token = _load_token(API_TOKEN_FILE_PATH)
-        headers = _build_headers(token)
-        book_data = _retrieve_metadata(vid, CERT_PATH, headers)
-        uuid = _get_uuid_and_post_new_data(book_data, CERT_PATH, headers, book_printer)
+        uuid = _get_uuid_and_post_new_data(vid, book_printer)
 
         # Update the book UUID in the Google sheet
         print("BOOK CREATED", uuid)
