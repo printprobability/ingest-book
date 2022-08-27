@@ -206,6 +206,10 @@ def run_command(book_string, preexisting_uuid, printer):
             print("Trying to get book data using ESTC info lookup...")
             book_metadata = _get_book_data_from_estc(estc_number=estc_no, printer=book_printer)
 
+        if book_metadata['id'] is not None:
+            print("Book already exists with UUID: ", book_metadata['id'])
+            exit(0)
+
         # Create book in our backend
         uuid = _get_uuid_and_post_new_data(book_metadata, book_printer)
 
