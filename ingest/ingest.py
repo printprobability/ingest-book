@@ -136,7 +136,7 @@ def _get_book_data_from_estc(estc_number, printer=None):
         'estc': estc_number,
         'pp_publisher': publisher_info,
         'pp_author': estc_info.get('Author'),
-        'pq_publisher': printer,
+        'pq_publisher': '',
         'pq_title': estc_info.get('Title'),
         'pq_author': estc_info.get('Author'),
         'pq_year_verbatim': year,
@@ -144,6 +144,7 @@ def _get_book_data_from_estc(estc_number, printer=None):
         'pq_year_late': year,
         'tx_year_early': year,
         'tx_year_late': year,
+        'pp_printer': printer,
         'date_early': first_day_of_year,
         'date_late': last_day_of_year,
     }
