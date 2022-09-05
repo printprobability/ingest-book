@@ -161,12 +161,14 @@ def _get_uuid_and_post_new_data(book_metadata, printer=None):
 
 
 # Create the batch command to ingest the book
-def _create_bash_command(book_uuid, folder_name):
+def _create_bash_command(book_uuid, folder_name, update=False):
     batch_command_prefix = 'sbatch -c 4 --mem-per-cpu=1999mb -p "RM-shared" -t 48:00:00'
     activate_virtual_env = 'source activate {0}'.format(VIRTUAL_ENV_PATH)
-    command_to_run = 'python3 {BULK_LOAD_JSON_SCRIPT} -b {book_uuid} -j {JSON_OUTPUT_PATH}/{folder_name}'.format(
+    update_option = '-u' if update else ''
+    command_to_run = 'python3 {BULK_LOAD_JSON_SCRIPT} {update_option} -b {book_uuid} ' \
+                     '-j {JSON_OUTPUT_PATH}/{folder_name}'.format(
         BULK_LOAD_JSON_SCRIPT=BULK_LOAD_JSON_SCRIPT, book_uuid=book_uuid,
-        JSON_OUTPUT_PATH=JSON_OUTPUT_PATH, folder_name=folder_name)
+        JSON_OUTPUT_PATH=JSON_OUTPUT_PATH, folder_name=folder_name, update_option=update_option)
     return '{batch_command_prefix} --wrap="module load anaconda3; {activate_virtual_env}; {command_to_run}"' \
         .format(batch_command_prefix=batch_command_prefix,
                 activate_virtual_env=activate_virtual_env,
@@ -197,29 +199,39 @@ def run_command(book_string, preexisting_uuid, printer):
         print("Pre-existing UUID provided: ", preexisting_uuid)
         command = _create_bash_command(preexisting_uuid, folder_name)
     else:  # this is a new book, we need to create it first
+        # by default, we are creating a book unless it already exists
+        update = False
+
         # VID lookup in the ESTC CSV
         vid = _get_vid(estc_no)
 
         # Try to retrieve metadata from our backend
         book_metadata = _retrieve_metadata(vid, CERT_PATH, _api_headers())
+
         if vid is None or book_metadata is None:
             print("Either VID is not present in our database or the book is not in our database.")
             print("Trying to get book data using ESTC info lookup...")
             book_metadata = _get_book_data_from_estc(estc_number=estc_no, printer=book_printer)
 
-        if book_metadata['id'] is not None:
-            print("Book already exists with UUID: ", book_metadata['id'])
-            exit(0)
+        if book_metadata is not None and book_metadata['id'] is not None:
+            book_id = book_metadata['id']
+            print("Book already exists with UUID: ", book_id)
+            # Update existing book
+            if not confirm('Continue with book update ?'):
+                exit(0)
+            update = True
+            uuid = book_id
 
-        # Create book in our backend
-        uuid = _get_uuid_and_post_new_data(book_metadata, book_printer)
+        if not update:
+            # Create book in our backend
+            uuid = _get_uuid_and_post_new_data(book_metadata, book_printer)
 
-        # Update the book UUID in the Google sheet
-        print("BOOK CREATED", uuid)
-        print("Updating UUID in Google sheet for ESTC number", estc_no, uuid)
-        update_uuid_in_sheet_for_estc_number(estc_no, uuid)
+            # Update the book UUID in the Google sheet
+            print("BOOK CREATED", uuid)
+            print("Updating UUID in Google sheet for ESTC number", estc_no, uuid)
+            update_uuid_in_sheet_for_estc_number(estc_no, uuid)
 
-        command = _create_bash_command(uuid, folder_name)
+        command = _create_bash_command(uuid, folder_name, update)
 
         print("ONCE COMPLETED, THIS BOOK WILL BE LOADED AT {BOOKS_URL}/{book_uuid}".format(BOOKS_URL=BOOKS_URL,
                                                                                            book_uuid=uuid))
