@@ -119,7 +119,7 @@ def _create_book(book, printer):
     return r.json()
 
 
-def _get_book_data_from_estc(estc_number, printer=None):
+def _get_book_data_from_estc(estc_number):
     estc_info = est_info_for_number(estc_number=estc_number)
 
     # Make sure we get the right data from ESTC, otherwise fail here
@@ -144,7 +144,6 @@ def _get_book_data_from_estc(estc_number, printer=None):
         'pq_year_late': year,
         'tx_year_early': year,
         'tx_year_late': year,
-        'pp_printer': printer,
         'date_early': first_day_of_year,
         'date_late': last_day_of_year,
     }
@@ -161,14 +160,18 @@ def _get_uuid_and_post_new_data(book_metadata, printer=None):
 
 
 # Create the batch command to ingest the book
-def _create_bash_command(book_uuid, folder_name, update=False):
+def _create_bash_command(book_uuid, folder_name, update=False, overwrite=False):
     batch_command_prefix = 'sbatch -c 4 --mem-per-cpu=1999mb -p "RM-shared" -t 48:00:00'
     activate_virtual_env = 'source activate {0}'.format(VIRTUAL_ENV_PATH)
-    update_option = '-u' if update else ''
-    command_to_run = 'python3 {BULK_LOAD_JSON_SCRIPT} {update_option} -b {book_uuid} ' \
-                     '-j {JSON_OUTPUT_PATH}/{folder_name}'.format(
-        BULK_LOAD_JSON_SCRIPT=BULK_LOAD_JSON_SCRIPT, book_uuid=book_uuid,
-        JSON_OUTPUT_PATH=JSON_OUTPUT_PATH, folder_name=folder_name, update_option=update_option)
+    update_option = '-u' if update and (not overwrite) else ''
+    overwrite_option = '-w' if (not update) and overwrite else ''
+    command_to_run = 'python3 {BULK_LOAD_JSON_SCRIPT} {update_option} {overwrite_option} -b {book_uuid} ' \
+                     '-j {JSON_OUTPUT_PATH}/{folder_name}'.format(BULK_LOAD_JSON_SCRIPT=BULK_LOAD_JSON_SCRIPT,
+                                                                  book_uuid=book_uuid,
+                                                                  JSON_OUTPUT_PATH=JSON_OUTPUT_PATH,
+                                                                  folder_name=folder_name,
+                                                                  update_option=update_option,
+                                                                  overwrite_option=overwrite_option)
     return '{batch_command_prefix} --wrap="module load anaconda3; {activate_virtual_env}; {command_to_run}"' \
         .format(batch_command_prefix=batch_command_prefix,
                 activate_virtual_env=activate_virtual_env,
@@ -180,7 +183,7 @@ def _get_printer_name_from_sheet(printer_short_name):
     return get_full_printer_name_for_short_name(printer_short_name)
 
 
-def run_command(book_string, preexisting_uuid, printer):
+def run_command(book_string, preexisting_uuid, printer, update, overwrite):
     # Folder name is same as the book string
     folder_name = book_string
 
@@ -190,51 +193,59 @@ def run_command(book_string, preexisting_uuid, printer):
     estc_no = split_book_string[1]
     print("ESTC number - ", estc_no)
 
-    # Use printer passed as argument, default to the fullname from Google sheet or the short-name as last default
-    book_printer = printer if printer is not None else _get_printer_name_from_sheet(split_book_string[0])
-    print("Using printer name as - ", book_printer)
-
-    # if this book already exists in our backend
-    if preexisting_uuid is not None:
-        print("Pre-existing UUID provided: ", preexisting_uuid)
-        command = _create_bash_command(preexisting_uuid, folder_name)
-    else:  # this is a new book, we need to create it first
-        # by default, we are creating a book unless it already exists
-        update = False
-
+    if preexisting_uuid is not None:  # we are trying to update or overwrite an existing book
+        if update or overwrite:
+            print("Pre-existing UUID provided: ", preexisting_uuid)
+            if update:
+                print("Updating book with UUID: ", preexisting_uuid)
+            elif overwrite:
+                print("Overwriting book with UUID: ", preexisting_uuid)
+            command = _create_bash_command(preexisting_uuid, folder_name, update, overwrite)
+        else:
+            print("Mandatory to specify either update or overwrite flag for a pre-existing UUID")
+            exit(0)
+    else:
         # VID lookup in the ESTC CSV
         vid = _get_vid(estc_no)
 
         # Try to retrieve metadata from our backend
-        book_metadata = _retrieve_metadata(vid, CERT_PATH, _api_headers())
+        book_metadata = _retrieve_metadata(vid, CERT_PATH, _api_headers()) if vid is not None else None
 
-        if vid is None or book_metadata is None:
-            print("Either VID is not present in our database or the book is not in our database.")
-            print("Trying to get book data using ESTC info lookup...")
-            book_metadata = _get_book_data_from_estc(estc_number=estc_no, printer=book_printer)
-
-        if book_metadata is not None and book_metadata['id'] is not None:
-            book_id = book_metadata['id']
-            print("Book already exists with UUID: ", book_id)
-            # Update existing book
-            if not confirm('Continue with book update ?'):
+        if book_metadata is None:  # we do not have this book from EEBO
+            if update or overwrite:  # we have nothing to update or overwrite
+                print("No book found in the database to update/overwrite for vid: ", vid)
                 exit(0)
-            update = True
-            uuid = book_id
+            else:
+                print("We do not have this book's metadata from EEBO.")
+                print("Getting book metadata using ESTC info lookup...")
+                book_metadata = _get_book_data_from_estc(estc_number=estc_no)
+                if book_metadata is None:
+                    print("Failed to fetch book data from ESTC, maybe ESTC website is down? Check - http://estc.bl.uk/")
+                    exit(0)
 
-        if not update:
+        if update or overwrite:
+            # UUID of existing book that we are trying to update or overwrite
+            uuid = book_metadata['id']
+            if update:
+                print("Updating book with UUID: ", uuid)
+            else:
+                print("Overwriting book with UUID: ", uuid)
+            command = _create_bash_command(uuid, folder_name, update, overwrite)
+            print("Once completed, book will be available at - {BOOKS_URL}/{book_uuid}"
+                  .format(BOOKS_URL=BOOKS_URL, book_uuid=uuid))
+        else:
+            # Use printer passed as argument, default to the fullname from
+            # Google sheet or the short-name as last default
+            book_printer = printer if printer is not None else _get_printer_name_from_sheet(split_book_string[0])
             # Create book in our backend
             uuid = _get_uuid_and_post_new_data(book_metadata, book_printer)
-
             # Update the book UUID in the Google sheet
-            print("BOOK CREATED", uuid)
+            print("Book created with UUID: ", uuid)
             print("Updating UUID in Google sheet for ESTC number", estc_no, uuid)
             update_uuid_in_sheet_for_estc_number(estc_no, uuid)
-
-        command = _create_bash_command(uuid, folder_name, update)
-
-        print("ONCE COMPLETED, THIS BOOK WILL BE LOADED AT {BOOKS_URL}/{book_uuid}".format(BOOKS_URL=BOOKS_URL,
-                                                                                           book_uuid=uuid))
+            command = _create_bash_command(uuid, folder_name)
+            print("ONCE COMPLETED, THIS BOOK WILL BE LOADED AT {BOOKS_URL}/{book_uuid}"
+                  .format(BOOKS_URL=BOOKS_URL, book_uuid=uuid))
 
     # subprocess.run(input=command)
     subprocess.run(command, shell=True)
