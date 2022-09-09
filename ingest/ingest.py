@@ -160,18 +160,16 @@ def _get_uuid_and_post_new_data(book_metadata, printer=None):
 
 
 # Create the batch command to ingest the book
-def _create_bash_command(book_uuid, folder_name, update=False, overwrite=False):
+def _create_bash_command(book_uuid, folder_name, update=False):
     batch_command_prefix = 'sbatch -c 4 --mem-per-cpu=1999mb -p "RM-shared" -t 48:00:00'
     activate_virtual_env = 'source activate {0}'.format(VIRTUAL_ENV_PATH)
-    update_option = '-u' if update and (not overwrite) else ''
-    overwrite_option = '-w' if (not update) and overwrite else ''
+    update_option = '-u' if update else ''
     command_to_run = 'python3 {BULK_LOAD_JSON_SCRIPT} {update_option} {overwrite_option} -b {book_uuid} ' \
                      '-j {JSON_OUTPUT_PATH}/{folder_name}'.format(BULK_LOAD_JSON_SCRIPT=BULK_LOAD_JSON_SCRIPT,
                                                                   book_uuid=book_uuid,
                                                                   JSON_OUTPUT_PATH=JSON_OUTPUT_PATH,
                                                                   folder_name=folder_name,
-                                                                  update_option=update_option,
-                                                                  overwrite_option=overwrite_option)
+                                                                  update_option=update_option)
     return '{batch_command_prefix} --wrap="module load anaconda3; {activate_virtual_env}; {command_to_run}"' \
         .format(batch_command_prefix=batch_command_prefix,
                 activate_virtual_env=activate_virtual_env,
@@ -183,7 +181,7 @@ def _get_printer_name_from_sheet(printer_short_name):
     return get_full_printer_name_for_short_name(printer_short_name)
 
 
-def run_command(book_string, preexisting_uuid, printer, update, overwrite):
+def run_command(book_string, preexisting_uuid, printer, update):
     # Folder name is same as the book string
     folder_name = book_string
 
@@ -194,16 +192,12 @@ def run_command(book_string, preexisting_uuid, printer, update, overwrite):
     print("ESTC number - ", estc_no)
 
     if preexisting_uuid is not None:  # we are trying to update or overwrite an existing book
-        if update or overwrite:
-            print("Pre-existing UUID provided: ", preexisting_uuid)
-            if update:
-                print("Updating book with UUID: ", preexisting_uuid)
-            elif overwrite:
-                print("Overwriting book with UUID: ", preexisting_uuid)
-            command = _create_bash_command(preexisting_uuid, folder_name, update, overwrite)
+        print("Pre-existing UUID provided: ", preexisting_uuid)
+        if update:
+            print("Updating/overwriting an existing run for book with UUID: ", preexisting_uuid)
         else:
-            print("Mandatory to specify either update or overwrite flag for a pre-existing UUID")
-            exit(0)
+            print("Creating a new run for the book with UUID: ", preexisting_uuid)
+        command = _create_bash_command(preexisting_uuid, folder_name, update)
     else:
         # VID lookup in the ESTC CSV
         vid = _get_vid(estc_no)
@@ -212,25 +206,21 @@ def run_command(book_string, preexisting_uuid, printer, update, overwrite):
         book_metadata = _retrieve_metadata(vid, CERT_PATH, _api_headers()) if vid is not None else None
 
         if book_metadata is None:  # we do not have this book from EEBO
-            if update or overwrite:  # we have nothing to update or overwrite
+            if update:  # we have nothing to update or overwrite
                 print("No book found in the database to update/overwrite for vid: ", vid)
                 exit(0)
-            else:
-                print("We do not have this book's metadata from EEBO.")
-                print("Getting book metadata using ESTC info lookup...")
-                book_metadata = _get_book_data_from_estc(estc_number=estc_no)
-                if book_metadata is None:
-                    print("Failed to fetch book data from ESTC, maybe ESTC website is down? Check - http://estc.bl.uk/")
-                    exit(0)
+            print("We do not have this book's metadata from EEBO.")
+            print("Getting book metadata using ESTC info lookup...")
+            book_metadata = _get_book_data_from_estc(estc_number=estc_no)
+            if book_metadata is None:
+                print("Failed to fetch book data from ESTC, maybe ESTC website is down? Check - http://estc.bl.uk/")
+                exit(0)
 
-        if update or overwrite:
+        if update:
             # UUID of existing book that we are trying to update or overwrite
             uuid = book_metadata['id']
-            if update:
-                print("Updating book with UUID: ", uuid)
-            else:
-                print("Overwriting book with UUID: ", uuid)
-            command = _create_bash_command(uuid, folder_name, update, overwrite)
+            print("Updating/overwriting an existing run for book with UUID: ", uuid)
+            command = _create_bash_command(uuid, folder_name, update)
             print("Once completed, book will be available at - {BOOKS_URL}/{book_uuid}"
                   .format(BOOKS_URL=BOOKS_URL, book_uuid=uuid))
         else:
