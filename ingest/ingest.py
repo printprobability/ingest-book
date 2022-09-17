@@ -221,6 +221,9 @@ def run_command(book_string, preexisting_uuid, printer, update):
             # UUID of existing book that we are trying to update or overwrite
             # We should have this UUID in our sheet
             uuid = get_uuid_for_book_string(book_string)
+            if uuid is None:
+                print("Cannot find book entry in pipeline excel sheet for book_string: ", book_string)
+                exit(0)
             print("Updating/overwriting an existing run for book with UUID: ", uuid)
             command = _create_bash_command(uuid, folder_name, update)
             print("Once updated, book will be available at - {BOOKS_URL}/{book_uuid}"
