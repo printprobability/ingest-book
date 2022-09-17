@@ -149,8 +149,8 @@ def _get_book_data_from_estc(estc_number):
         'date_late': last_day_of_year,
     }
     print('Using the following metadata to create the book - ', json.dumps(book_metadata, indent=4))
-    if not confirm('Continue with these details ?'):
-        exit(0)
+    # if not confirm('Continue with these details ?'):
+    #     exit(0)
     return book_metadata
 
 
