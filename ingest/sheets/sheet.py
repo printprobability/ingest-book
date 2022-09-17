@@ -18,6 +18,17 @@ def _get_sheet():
     return sh
 
 
+def get_uuid_for_book_string(book_string) -> str:
+    sh = _get_sheet()
+    wks = sh.worksheet_by_title('Pipeline Progress')
+    index = 0
+    for row in wks:
+        index += 1
+        if row[6] in book_string:
+            print('found given book string number at index', index)
+            return row[18]
+
+
 def update_uuid_in_sheet_for_estc_number(estc_no, uuid):
     sh = _get_sheet()
     wks = sh.worksheet_by_title('Pipeline Progress')

@@ -9,7 +9,8 @@ import json
 import datetime
 import requests
 import subprocess
-from .sheets.sheet import get_full_printer_name_for_short_name, update_uuid_in_sheet_for_estc_number
+from .sheets.sheet import get_full_printer_name_for_short_name, \
+    update_uuid_in_sheet_for_estc_number, get_uuid_for_book_string
 from .estc_search.estc import est_info_for_number
 from .util import confirm
 
@@ -218,10 +219,11 @@ def run_command(book_string, preexisting_uuid, printer, update):
 
         if update:
             # UUID of existing book that we are trying to update or overwrite
-            uuid = book_metadata['id']
+            # We should have this UUID in our sheet
+            uuid = get_uuid_for_book_string(book_string)
             print("Updating/overwriting an existing run for book with UUID: ", uuid)
             command = _create_bash_command(uuid, folder_name, update)
-            print("Once completed, book will be available at - {BOOKS_URL}/{book_uuid}"
+            print("Once updated, book will be available at - {BOOKS_URL}/{book_uuid}"
                   .format(BOOKS_URL=BOOKS_URL, book_uuid=uuid))
         else:
             # Use printer passed as argument, default to the fullname from
