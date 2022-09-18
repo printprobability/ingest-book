@@ -165,7 +165,7 @@ def _create_bash_command(book_uuid, folder_name, update=False):
     batch_command_prefix = 'sbatch -c 4 --mem-per-cpu=1999mb -p "RM-shared" -t 48:00:00'
     activate_virtual_env = 'source activate {0}'.format(VIRTUAL_ENV_PATH)
     update_option = '-u' if update else ''
-    command_to_run = 'python3 {BULK_LOAD_JSON_SCRIPT} {update_option} {overwrite_option} -b {book_uuid} ' \
+    command_to_run = 'python3 {BULK_LOAD_JSON_SCRIPT} {update_option} -b {book_uuid} ' \
                      '-j {JSON_OUTPUT_PATH}/{folder_name}'.format(BULK_LOAD_JSON_SCRIPT=BULK_LOAD_JSON_SCRIPT,
                                                                   book_uuid=book_uuid,
                                                                   JSON_OUTPUT_PATH=JSON_OUTPUT_PATH,
