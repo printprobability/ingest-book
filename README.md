@@ -20,12 +20,6 @@ Verif that you are using the right Python version (`3.9.12`) and your conda env 
 conda info
 ```
 
-c)
-
-```shell
-poetry install
-```
-
 ## Step 2. Run ingest script
 ```shell
 ./ingest_book.sh --book_string <book-string-value> --printer <optional-printer-full-name> --uuid <optional-existing-uuid>
