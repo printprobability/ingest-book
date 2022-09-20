@@ -10,8 +10,26 @@ curl -sSL https://install.python-poetry.org | python3 -
 
 ## Step 1. Prepare environment
 
+a) 
 ```shell
 source init_env.sh
+```
+
+b)
+```shell
+source conda_env.sh
+```
+
+Verif that you are using the right Python version (`3.9.12`) and your conda env is created by the name of `env` - 
+
+```shell
+conda info
+```
+
+c)
+
+```shell
+poetry install
 ```
 
 ## Step 2. Run ingest script
