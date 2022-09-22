@@ -51,6 +51,12 @@ def _build_headers(token):
     return {'Authorization': 'Token {}'.format(token)}
 
 
+def _api_headers():
+    token = _load_token(API_TOKEN_FILE_PATH)
+    headers = _build_headers(token)
+    return headers
+
+
 def _get_vid_for_estc_number(estc_number):
     with open(ESTC_LOOKUP_CSV) as csvfile:
         reader = DictReader(csvfile)
@@ -68,20 +74,35 @@ def _get_vid(estc_number_as_string) -> str:
         print("It looks like that ESTC number may not be in our file?")
 
 
-def _retrieve_metadata(vid, verify, headers):
+def _retrieve_metadata(vid):
+    verify = CERT_PATH
+    headers = _api_headers()
     payload = {'vid': vid}
     r = requests.get(BOOKS_API_URL, headers=headers, params=payload, verify=verify)
     result = r.json().get('results')
     if result is None or len(result) == 0:
         print('Error fetching metadata for VID -', vid)
         return None
-    return result[0]
+    return result[0]  # we assume that the first book that matches is the metadata we want, TODO: this may not be true.
 
 
-def _api_headers():
-    token = _load_token(API_TOKEN_FILE_PATH)
-    headers = _build_headers(token)
-    return headers
+def _existing_book_for_uuid(uuid):
+    verify = CERT_PATH
+    headers = _api_headers()
+    try:
+        r = requests.get(BOOKS_API_URL + uuid, headers=headers, verify=verify)
+        result = r.json().get('results')
+        if result is None or len(result) == 0:
+            print('No book found for given pre-existing UUID: ', uuid)
+            return None
+        return result[0]
+    except requests.exceptions.HTTPError as err:
+        print('Error fetching existing book for UUID: ', uuid, err)
+        exit(0)
+
+def _existing_book_has_no_characters(book):
+    all_runs = book['all_runs']
+    return len(all_runs['pages']) == 0 and len(all_runs['lines']) == 0 and len(all_runs['characters']) == 0
 
 
 def _create_book(book, printer):
@@ -154,7 +175,7 @@ def _get_book_data_from_estc(estc_number):
     return book_metadata
 
 
-def _get_uuid_and_post_new_data(book_metadata, printer=None):
+def _create_new_book_with_data(book_metadata, printer=None):
     response = _create_book(book_metadata, printer)
     print('Create book response from backend - ', response)
     return response['id']  # UUID of the book
@@ -192,19 +213,27 @@ def run_command(book_string, preexisting_uuid, printer, update):
     estc_no = split_book_string[1]
     print("ESTC number - ", estc_no)
 
-    if preexisting_uuid is not None:  # we are trying to update or overwrite an existing book
-        print("Pre-existing UUID provided: ", preexisting_uuid)
+    existing_book = _existing_book_for_uuid(preexisting_uuid) if preexisting_uuid else None
+
+    # Existing book
+    if existing_book is not None:
+        print('We have an existing book with UUID: ', preexisting_uuid)
+        # check if the book has an existing run or not
+        no_characters_in_book = _existing_book_has_no_characters(existing_book)
+        if update and no_characters_in_book:
+            update = False # we have nothing to update, we'll have to create a new run
+            print(f'Existing book for UUID - {preexisting_uuid} has no runs yet.')
         if update:
-            print("Updating/overwriting an existing run for book with UUID: ", preexisting_uuid)
+            print('Updating/overwriting an existing run for book with UUID: ', preexisting_uuid)
         else:
-            print("Creating a new run for the book with UUID: ", preexisting_uuid)
+            print('Creating a new run for the book with UUID: ', preexisting_uuid)
         command = _create_bash_command(preexisting_uuid, folder_name, update)
-    else:
+    else:  # We don't have a specific UUID
         # VID lookup in the ESTC CSV
         vid = _get_vid(estc_no)
 
         # Try to retrieve metadata from our backend
-        book_metadata = _retrieve_metadata(vid, CERT_PATH, _api_headers()) if vid is not None else None
+        book_metadata = _retrieve_metadata(vid) if vid is not None else None
 
         if book_metadata is None:  # we do not have this book from EEBO
             if update:  # we have nothing to update or overwrite
@@ -218,22 +247,36 @@ def run_command(book_string, preexisting_uuid, printer, update):
                 exit(0)
 
         if update:
-            # UUID of existing book that we are trying to update or overwrite
+            # UUID of existing book for the ESTC that we are trying to update or overwrite
             # We should have this UUID in our sheet
             uuid = get_uuid_for_book_string(book_string)
             if uuid is None:
                 print("Cannot find book entry in pipeline excel sheet for book_string: ", book_string)
+                print("Nothing to update.")
                 exit(0)
-            print("Updating/overwriting an existing run for book with UUID: ", uuid)
-            command = _create_bash_command(uuid, folder_name, update)
-            print("Once updated, book will be available at - {BOOKS_URL}/{book_uuid}"
-                  .format(BOOKS_URL=BOOKS_URL, book_uuid=uuid))
+            # Check existing book for update
+            existing_book = _existing_book_for_uuid(uuid)
+            if existing_book is None:
+                print(f'No book found for UUID - {uuid}.')
+                exit(0)
+            else:
+                # check if the book has an existing run or not
+                no_characters_in_book = _existing_book_has_no_characters(existing_book)
+                if no_characters_in_book:
+                    update = False # we have nothing to update, we'll have to create a new run
+                    print(f'Existing book for UUID - {uuid} has no runs yet.')
+                    print('Creating a new run for the book with UUID: ', uuid)
+                else:
+                    print("Updating an existing run for book with UUID: ", uuid)
+                command = _create_bash_command(uuid, folder_name, update)
+                print("Once completed, book will be available at - {BOOKS_URL}/{book_uuid}"
+                      .format(BOOKS_URL=BOOKS_URL, book_uuid=uuid))
         else:
             # Use printer passed as argument, default to the fullname from
             # Google sheet or the short-name as last default
             book_printer = printer if printer is not None else _get_printer_name_from_sheet(split_book_string[0])
             # Create book in our backend
-            uuid = _get_uuid_and_post_new_data(book_metadata, book_printer)
+            uuid = _create_new_book_with_data(book_metadata, book_printer)
             # Update the book UUID in the Google sheet
             print("Book created with UUID: ", uuid)
             print("Updating UUID in Google sheet for ESTC number", estc_no, uuid)
