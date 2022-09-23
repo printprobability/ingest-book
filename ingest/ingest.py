@@ -20,8 +20,8 @@ BOOKS_API_URL = 'https://printprobdb.psc.edu/api/books/'
 BOOKS_URL = 'https://printprobdb.psc.edu/books'
 CERT_PATH = '/ocean/projects/hum160002p/shared/api/incommonrsaserverca-bundle.crt'
 BULK_LOAD_JSON_SCRIPT = '/ocean/projects/hum160002p/shared/api/bulk_load_json.py'
-VIRTUAL_ENV_PATH = '/ocean/projects/hum160002p/gsell/.conda/envs/my_env'
 ESTC_LOOKUP_CSV = '/ocean/projects/hum160002p/shared/api/estc_vid_lookup.csv'
+INIT_ENV_SCRIPT = '/ocean/projects/hum160002p/shared/books/code/ingest-book/init_env.sh'
 
 
 def _year_from_imprint_value(imprint_value):
@@ -99,6 +99,7 @@ def _existing_book_for_uuid(uuid):
     except requests.exceptions.HTTPError as err:
         print('Error fetching existing book for UUID: ', uuid, err)
         exit(0)
+
 
 def _existing_book_has_no_characters(book):
     all_runs = book['all_runs']
@@ -183,15 +184,15 @@ def _create_new_book_with_data(book_metadata, printer=None):
 
 # Create the batch command to ingest the book
 def _create_bash_command(book_uuid, folder_name, update=False):
-    batch_command_prefix = 'sbatch -c 4 --mem-per-cpu=1999mb -p "RM-shared" -t 48:00:00'
-    activate_virtual_env = 'source activate {0}'.format(VIRTUAL_ENV_PATH)
+    batch_command_prefix = 'sbatch -c 10 --mem-per-cpu=1999mb -p "RM-shared" -t 48:00:00'
+    activate_virtual_env = 'source ~/.bashrc; source {init_env_script}'.format(init_env_script=INIT_ENV_SCRIPT)
     update_option = '-u' if update else ''
     command_to_run = 'python3 {BULK_LOAD_JSON_SCRIPT} {update_option} -b {book_uuid} ' \
-                     '-j {JSON_OUTPUT_PATH}/{folder_name}'.format(BULK_LOAD_JSON_SCRIPT=BULK_LOAD_JSON_SCRIPT,
-                                                                  book_uuid=book_uuid,
-                                                                  JSON_OUTPUT_PATH=JSON_OUTPUT_PATH,
-                                                                  folder_name=folder_name,
-                                                                  update_option=update_option)
+                     '-j {JSON_OUTPUT_PATH}/{folder_name}_color'.format(BULK_LOAD_JSON_SCRIPT=BULK_LOAD_JSON_SCRIPT,
+                                                                        book_uuid=book_uuid,
+                                                                        JSON_OUTPUT_PATH=JSON_OUTPUT_PATH,
+                                                                        folder_name=folder_name,
+                                                                        update_option=update_option)
     return '{batch_command_prefix} --wrap="module load anaconda3; {activate_virtual_env}; {command_to_run}"' \
         .format(batch_command_prefix=batch_command_prefix,
                 activate_virtual_env=activate_virtual_env,
@@ -221,7 +222,7 @@ def run_command(book_string, preexisting_uuid, printer, update):
         # check if the book has an existing run or not
         no_characters_in_book = _existing_book_has_no_characters(existing_book)
         if update and no_characters_in_book:
-            update = False # we have nothing to update, we'll have to create a new run
+            update = False  # we have nothing to update, we'll have to create a new run
             print(f'Existing book for UUID - {preexisting_uuid} has no runs yet.')
         if update:
             print('Updating/overwriting an existing run for book with UUID: ', preexisting_uuid)
@@ -263,7 +264,7 @@ def run_command(book_string, preexisting_uuid, printer, update):
                 # check if the book has an existing run or not
                 no_characters_in_book = _existing_book_has_no_characters(existing_book)
                 if no_characters_in_book:
-                    update = False # we have nothing to update, we'll have to create a new run
+                    update = False  # we have nothing to update, we'll have to create a new run
                     print(f'Existing book for UUID - {uuid} has no runs yet.')
                     print('Creating a new run for the book with UUID: ', uuid)
                 else:
