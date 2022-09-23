@@ -221,7 +221,7 @@ def run_command(book_string, preexisting_uuid, printer, update):
         print('We have an existing book with UUID: ', preexisting_uuid)
         # check if the book has an existing run or not
         no_characters_in_book = _existing_book_has_no_characters(existing_book)
-        if update and no_characters_in_book:
+        if no_characters_in_book:
             update = False  # we have nothing to update, we'll have to create a new run
             print(f'Existing book for UUID - {preexisting_uuid} has no runs yet.')
         if update:
