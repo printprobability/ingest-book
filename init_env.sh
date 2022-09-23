@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 export PATH=/ocean/projects/hum160002p/shared/books/code/printprob-env/python/3.9.12/bin:${PATH}
-source /ocean/projects/hum160002p/shared/books/code/printprob-env/.env
 echo "Loading anaconda3 module..."
 module load anaconda3
 OUT=$(conda info --envs  | grep ".conda/envs/env")
@@ -15,4 +14,5 @@ conda activate env
 echo "Activated."
 echo "Installing Poetry Dependencies..."
 poetry install
+source /ocean/projects/hum160002p/shared/books/code/printprob-env/.env
 echo "Completed env setup."
