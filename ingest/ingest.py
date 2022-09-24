@@ -91,12 +91,8 @@ def _existing_book_for_uuid(uuid):
     headers = _api_headers()
     try:
         r = requests.get(f'{BOOKS_API_URL}{uuid}/', headers=headers, verify=verify)
-        result = r.json().get('results')
-        print("Finding book ", f'{BOOKS_API_URL}{uuid}/')
-        print("Book result: ", result)
-        if result is None or len(result) == 0:
-            return None
-        return result[0]
+        result = r.json()
+        return result
     except requests.exceptions.HTTPError as err:
         print('Error fetching existing book for UUID: ', uuid, err)
         exit(0)
