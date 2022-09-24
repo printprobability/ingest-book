@@ -92,8 +92,8 @@ def _existing_book_for_uuid(uuid):
     try:
         r = requests.get(BOOKS_API_URL + uuid, headers=headers, verify=verify)
         result = r.json().get('results')
+        print("Book result: ", result)
         if result is None or len(result) == 0:
-            print('No book found for given pre-existing UUID: ', uuid)
             return None
         return result[0]
     except requests.exceptions.HTTPError as err:
@@ -222,7 +222,9 @@ def run_command(book_string, preexisting_uuid, printer, update):
     # Existing book
     if preexisting_uuid is not None:
         existing_book = _existing_book_for_uuid(preexisting_uuid)
-
+        if existing_book is None:
+            print('No book found for given pre-existing UUID: ', preexisting_uuid)
+            exit(0)
         print('We have an existing book with UUID: ', preexisting_uuid)
         # check if the book has an existing run or not
         no_characters_in_book = _existing_book_has_no_characters(existing_book)
