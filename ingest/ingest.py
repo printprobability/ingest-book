@@ -235,7 +235,7 @@ def run_command(book_string, preexisting_uuid, printer, update):
         command = _create_bash_command(preexisting_uuid, folder_name, update)
         print("Once completed, book will be available at - {BOOKS_URL}/{book_uuid}"
               .format(BOOKS_URL=BOOKS_URL, book_uuid=preexisting_uuid))
-    else:
+    else: # creating a new book
         # VID lookup in the ESTC CSV
         vid = _get_vid(estc_no)
 
@@ -243,9 +243,6 @@ def run_command(book_string, preexisting_uuid, printer, update):
         book_metadata = _retrieve_metadata(vid) if vid is not None else None
 
         if book_metadata is None:  # we do not have this book from EEBO
-            if update:  # we have nothing to update or overwrite
-                print("No book found in the database to update/overwrite for vid: ", vid)
-                exit(0)
             print("We do not have this book's metadata from EEBO.")
             print("Getting book metadata using ESTC info lookup...")
             book_metadata = _get_book_data_from_estc(estc_number=estc_no)
