@@ -92,7 +92,7 @@ def _existing_book_for_uuid(uuid):
     try:
         r = requests.get(f'{BOOKS_API_URL}{uuid}/', headers=headers, verify=verify)
         result = r.json().get('results')
-        print("Finding book with UUID: ", uuid)
+        print("Finding book ", f'{BOOKS_API_URL}{uuid}/')
         print("Book result: ", result)
         if result is None or len(result) == 0:
             return None
