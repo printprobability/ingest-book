@@ -217,6 +217,7 @@ def run_command(book_string, preexisting_uuid, printer, update):
         # UUID of existing book for the ESTC that we are trying to update or overwrite
         # We should have this UUID in our sheet
         preexisting_uuid = get_uuid_for_book_string(book_string)
+        print("Existing UUID from Google sheet - ", preexisting_uuid)
         if preexisting_uuid and not preexisting_uuid.strip():
             preexisting_uuid = None
 
