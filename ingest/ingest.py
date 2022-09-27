@@ -91,8 +91,10 @@ def _existing_book_for_uuid(uuid):
     headers = _api_headers()
     try:
         r = requests.get(f'{BOOKS_API_URL}{uuid}/', headers=headers, verify=verify)
-        result = r.json()
-        return result
+        if r.status_code == 200 and r.headers['Content-Type'] == 'application/json':
+            result = r.json()
+            return result
+        return None
     except requests.exceptions.HTTPError as err:
         print('Error fetching existing book for UUID: ', uuid, err)
         exit(0)
