@@ -228,6 +228,7 @@ def run_command(book_string, preexisting_uuid, printer, update):
     existing_books = _existing_books_for_estc(estc_no)
     if existing_books is not None:
         logging.info("We have multiple existing books for ESTC!")
+        logging.info(existing_books)
         for book in existing_books:
             logging.info({"Existing book with UUID for the same ESTC": book.id})
         logging.info("Please specify an explicit UUID to use or delete the existing books before trying to create")
