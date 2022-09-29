@@ -223,14 +223,15 @@ def run_command(book_string, preexisting_uuid, printer, update):
     estc_no = split_book_string[1]
     print("ESTC number - ", estc_no)
 
-    # A book already exists for this ESTC number, we cannot create
-    existing_books = _existing_books_for_estc(estc_no)
-    if existing_books is not None:
-        print("We have multiple existing books for ESTC!")
-        for book in existing_books:
-            print("Existing book with UUID for the same ESTC", book.get('id'))
-        print("Please specify an explicit UUID to use or delete the existing books before trying to create")
-        exit(0)
+    # A book already exists for this ESTC number, we cannot create if we did not specify an explicit UUID
+    if preexisting_uuid is None:
+        existing_books = _existing_books_for_estc(estc_no)
+        if existing_books is not None:
+            print("We have multiple existing books for ESTC!")
+            for book in existing_books:
+                print("Existing book with UUID for the same ESTC", book.get('id'))
+            print("Please specify an explicit UUID to use or delete the existing books before trying to create")
+            exit(0)
 
     if preexisting_uuid is None:
         # UUID of existing book for the ESTC that we are trying to update or overwrite
