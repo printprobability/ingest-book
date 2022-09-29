@@ -224,6 +224,15 @@ def run_command(book_string, preexisting_uuid, printer, update):
     estc_no = split_book_string[1]
     print("ESTC number - ", estc_no)
 
+    # A book already exists for this ESTC number, we cannot create
+    existing_books = _existing_books_for_estc(estc_no)
+    if existing_books is not None:
+        logging.info("We have multiple existing books for ESTC!")
+        for book in existing_books:
+            logging.info({"Existing book with UUID for the same ESTC": book.id})
+        logging.info("Please specify an explicit UUID to use or delete the existing books before trying to create")
+        exit(0)
+
     if preexisting_uuid is None:
         # UUID of existing book for the ESTC that we are trying to update or overwrite
         # We should have this UUID in our sheet
@@ -253,14 +262,6 @@ def run_command(book_string, preexisting_uuid, printer, update):
         print("Once completed, book will be available at - {BOOKS_URL}/{book_uuid}"
               .format(BOOKS_URL=BOOKS_URL, book_uuid=preexisting_uuid))
     else: # creating a new book
-        # A book already exists for this ESTC number, we cannot create
-        existing_books = _existing_books_for_estc(estc_no)
-        if existing_books is not None:
-            for book in existing_books:
-                logging.info({"Existing book with UUID for the same ESTC": book.id})
-            logging.info("Please specify an explicit UUID to use or delete the existing books before trying to create")
-            exit(0)
-
         # VID lookup in the ESTC CSV
         vid = _get_vid(estc_no)
 
