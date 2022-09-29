@@ -3,7 +3,6 @@ Original Authors: Chris/Nikolai
 Hookup a book to the api by looking up its VID in database using ESTC no.
 Called from the workflow.
 """
-import logging
 from csv import DictReader
 import re
 import json
@@ -107,7 +106,7 @@ def _existing_books_for_estc(estc):
     result = r.json().get('results')
     if result is None or len(result) == 0:
         return None
-    logging.info({"Book already exists for ESTC, exiting": estc})
+    print("Book already exists for ESTC: ", estc)
     return result
 
 
@@ -227,10 +226,10 @@ def run_command(book_string, preexisting_uuid, printer, update):
     # A book already exists for this ESTC number, we cannot create
     existing_books = _existing_books_for_estc(estc_no)
     if existing_books is not None:
-        logging.info("We have multiple existing books for ESTC!")
+        print("We have multiple existing books for ESTC!")
         for book in existing_books:
-            logging.info({"Existing book with UUID for the same ESTC": book['id']})
-        logging.info("Please specify an explicit UUID to use or delete the existing books before trying to create")
+            print("Existing book with UUID for the same ESTC", book.get('id'))
+        print("Please specify an explicit UUID to use or delete the existing books before trying to create")
         exit(0)
 
     if preexisting_uuid is None:
