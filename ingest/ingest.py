@@ -89,7 +89,7 @@ def _retrieve_metadata(vid):
     if result is None or len(result) == 0:
         print('Error fetching metadata for VID -', vid)
         return None
-    book = result[0] # we assume that the first book that matches is the metadata we want, TODO: this may not be true.
+    book = result[0]  # we assume that the first book that matches is the metadata we want, TODO: this may not be true.
     _update_dates(book)
     return book
 
@@ -118,7 +118,7 @@ def _existing_books_for_estc(estc):
 
 
 def _is_not_eebo_book(book):
-    return bool(book.get('is_eebo_book') == 'false')
+    return bool(book.get('is_eebo_book') == False)
 
 
 def _exactly_one_non_eebo_book(books):
@@ -250,7 +250,7 @@ def run_command(book_string, preexisting_uuid, printer, update):
         # Lookup UUID in our sheet
         preexisting_uuid = get_uuid_for_book_string_from_sheet(book_string)
         if preexisting_uuid is not None and not preexisting_uuid.strip():
-            preexisting_uuid = None # No existing UUID
+            preexisting_uuid = None  # No existing UUID
         else:
             print("Existing UUID from Google sheet - ", preexisting_uuid)
 
