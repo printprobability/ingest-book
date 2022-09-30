@@ -74,6 +74,12 @@ def _get_vid(estc_number_as_string) -> str:
         print("It looks like that ESTC number may not be in our file?")
 
 
+# For EEBO metadata case
+def _update_dates(book):
+    book['date_early'] = book['pq_year_early']
+    book['date_late'] = book['pq_year_late']
+
+
 def _retrieve_metadata(vid):
     verify = CERT_PATH
     headers = _api_headers()
@@ -83,7 +89,9 @@ def _retrieve_metadata(vid):
     if result is None or len(result) == 0:
         print('Error fetching metadata for VID -', vid)
         return None
-    return result[0]  # we assume that the first book that matches is the metadata we want, TODO: this may not be true.
+    book = result[0] # we assume that the first book that matches is the metadata we want, TODO: this may not be true.
+    _update_dates(book)
+    return book
 
 
 def _existing_book_for_uuid(uuid):
