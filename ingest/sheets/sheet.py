@@ -18,7 +18,7 @@ def _get_sheet():
     return sh
 
 
-def get_uuid_for_book_string(book_string) -> str:
+def get_uuid_for_book_string_from_sheet(book_string) -> str:
     sh = _get_sheet()
     wks = sh.worksheet_by_title('Pipeline Progress')
     index = 0

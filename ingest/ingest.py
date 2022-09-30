@@ -10,7 +10,7 @@ import datetime
 import requests
 import subprocess
 from .sheets.sheet import get_full_printer_name_for_short_name, \
-    update_uuid_in_sheet_for_estc_number, get_uuid_for_book_string
+    update_uuid_in_sheet_for_estc_number, get_uuid_for_book_string_from_sheet
 from .estc_search.estc import est_info_for_number
 from .util import confirm
 
@@ -106,8 +106,22 @@ def _existing_books_for_estc(estc):
     result = r.json().get('results')
     if result is None or len(result) == 0:
         return None
-    print("Book already exists for ESTC: ", estc)
     return result
+
+
+def _is_not_eebo_book(book):
+    return bool(book.get('is_eebo_book') == 'false')
+
+
+def _exactly_one_non_eebo_book(books):
+    non_eebo_books = []
+    for book in books:
+        if _is_not_eebo_book(book):
+            non_eebo_books.append(book)
+    if len(non_eebo_books) > 1:
+        print("We have multiple non-EEBO books, exiting. Please specify a UUID.")
+        exit(0)
+    return None if len(non_eebo_books) == 0 else non_eebo_books[0]
 
 
 def _existing_book_has_no_characters(book):
@@ -223,27 +237,18 @@ def run_command(book_string, preexisting_uuid, printer, update):
     estc_no = split_book_string[1]
     print("ESTC number - ", estc_no)
 
-    # A book already exists for this ESTC number, we cannot create if we did not specify an explicit UUID
-    if preexisting_uuid is None:
-        existing_books = _existing_books_for_estc(estc_no)
-        if existing_books is not None:
-            print("We have multiple existing books for ESTC!")
-            for book in existing_books:
-                print("Existing book with UUID for the same ESTC", book.get('id'))
-            print("Please specify an explicit UUID to use or delete the existing books before trying to create")
-            exit(0)
-
     if preexisting_uuid is None:
         # UUID of existing book for the ESTC that we are trying to update or overwrite
-        # We should have this UUID in our sheet
-        preexisting_uuid = get_uuid_for_book_string(book_string)
+        # Lookup UUID in our sheet
+        preexisting_uuid = get_uuid_for_book_string_from_sheet(book_string)
         if preexisting_uuid is not None and not preexisting_uuid.strip():
-            preexisting_uuid = None
+            preexisting_uuid = None # No existing UUID
         else:
             print("Existing UUID from Google sheet - ", preexisting_uuid)
 
-    # Existing book
+    # Specific UUID from commandline
     if preexisting_uuid is not None:
+        book_uuid = preexisting_uuid
         existing_book = _existing_book_for_uuid(preexisting_uuid)
         if existing_book is None:
             print('No book found for given pre-existing UUID: ', preexisting_uuid)
@@ -254,40 +259,49 @@ def run_command(book_string, preexisting_uuid, printer, update):
         if no_characters_in_book:
             update = False  # we have nothing to update, we'll have to create a new run
             print(f'Existing book for UUID - {preexisting_uuid} has no runs yet.')
-        if update:
-            print('Updating/overwriting an existing run for book with UUID: ', preexisting_uuid)
+    else:
+        target_book = None
+        existing_books = _existing_books_for_estc(estc_no)
+        if existing_books is not None:
+            non_eebo_existing_book = _exactly_one_non_eebo_book(existing_books)
+            if non_eebo_existing_book is not None:
+                target_book = non_eebo_existing_book
+
+        if target_book is not None:
+            book_uuid = target_book.id
         else:
-            print('Creating a new run for the book with UUID: ', preexisting_uuid)
-        command = _create_bash_command(preexisting_uuid, folder_name, update)
-        print("Once completed, book will be available at - {BOOKS_URL}/{book_uuid}"
-              .format(BOOKS_URL=BOOKS_URL, book_uuid=preexisting_uuid))
-    else: # creating a new book
-        # VID lookup in the ESTC CSV
-        vid = _get_vid(estc_no)
+            update = False
+            # VID lookup in the ESTC CSV
+            vid = _get_vid(estc_no)
 
-        # Try to retrieve metadata based on VID
-        book_metadata = _retrieve_metadata(vid) if vid is not None else None
+            # Try to retrieve metadata based on VID
+            book_metadata = _retrieve_metadata(vid) if vid is not None else None
 
-        if book_metadata is None:  # we do not have this book from EEBO
-            print("We do not have this book's metadata from EEBO.")
-            print("Getting book metadata using ESTC info lookup...")
-            book_metadata = _get_book_data_from_estc(estc_number=estc_no)
-            if book_metadata is None:
-                print("Failed to fetch book data from ESTC, maybe ESTC website is down? Check - http://estc.bl.uk/")
-                exit(0)
+            if book_metadata is None:  # we do not have this book from EEBO
+                print("We do not have this book's metadata from EEBO.")
+                print("Getting book metadata using ESTC info lookup...")
+                book_metadata = _get_book_data_from_estc(estc_number=estc_no)
+                if book_metadata is None:
+                    print("Failed to fetch book data from ESTC, maybe ESTC website is down? Check - http://estc.bl.uk/")
+                    exit(0)
 
-        # Use printer passed as argument, default to the fullname from
-        # Google sheet or the short-name as last default
-        book_printer = printer if printer is not None else _get_printer_name_from_sheet(split_book_string[0])
-        # Create book in our backend
-        book_uuid_from_sheet = _create_new_book_with_data(book_metadata, book_printer)
-        # Update the book UUID in the Google sheet
-        print("Book created with UUID: ", book_uuid_from_sheet)
-        print("Updating UUID in Google sheet for ESTC number", estc_no, book_uuid_from_sheet)
-        update_uuid_in_sheet_for_estc_number(estc_no, book_uuid_from_sheet)
-        command = _create_bash_command(book_uuid_from_sheet, folder_name)
-        print("ONCE COMPLETED, THIS BOOK WILL BE LOADED AT {BOOKS_URL}/{book_uuid}"
-              .format(BOOKS_URL=BOOKS_URL, book_uuid=book_uuid_from_sheet))
+            # Use printer passed as argument, default to the fullname from
+            # Google sheet or the short-name as last default
+            book_printer = printer if printer is not None else _get_printer_name_from_sheet(split_book_string[0])
+            # Create book in our backend
+            book_uuid = _create_new_book_with_data(book_metadata, book_printer)
+            # Update the book UUID in the Google sheet
+            print("Book created with UUID: ", book_uuid)
+
+    print("Updating UUID in Google sheet for ESTC number", estc_no, book_uuid)
+    update_uuid_in_sheet_for_estc_number(estc_no, book_uuid)
+    if update:
+        print('Updating/overwriting an existing run for book with UUID: ', book_uuid)
+    else:
+        print('Creating a new run for the book with UUID: ', book_uuid)
+    command = _create_bash_command(book_uuid, folder_name, update)
+    print("ONCE COMPLETED, THIS BOOK WILL BE LOADED AT {BOOKS_URL}/{book_uuid}"
+          .format(BOOKS_URL=BOOKS_URL, book_uuid=book_uuid))
 
     # subprocess.run(input=command)
     subprocess.run(command, shell=True)
