@@ -77,10 +77,10 @@ def _get_vid(estc_number_as_string) -> str:
 # For EEBO metadata case
 def _update_dates(book):
     year_early = book['pq_year_early']
-    if year_early is not None and not year_early.strip():
+    if year_early is not None:
         book['date_early'] = datetime.datetime(int(year_early), 1, 1).strftime('%Y-%m-%d')
     year_late = book['pq_year_late']
-    if year_late is not None and not year_late.strip():
+    if year_late is not None:
         book['date_late'] = datetime.datetime(int(year_late), 12, 31).strftime('%Y-%m-%d')
 
 
