@@ -281,7 +281,7 @@ def run_command(book_string, preexisting_uuid, printer, update):
                 print('Found non-EEBO target book: ', json.dumps(target_book, indent=4))
 
         if target_book is not None:
-            book_uuid = target_book.id
+            book_uuid = target_book['id']
         else:
             update = False
             # VID lookup in the ESTC CSV
