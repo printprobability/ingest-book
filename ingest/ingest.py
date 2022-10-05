@@ -278,6 +278,7 @@ def run_command(book_string, preexisting_uuid, printer, update):
             non_eebo_existing_book = _exactly_one_non_eebo_book(existing_books)
             if non_eebo_existing_book is not None:
                 target_book = non_eebo_existing_book
+                print('Found non-EEBO target book: ', json.dumps(target_book, indent=4))
 
         if target_book is not None:
             book_uuid = target_book.id
