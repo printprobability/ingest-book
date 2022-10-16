@@ -85,10 +85,9 @@ def _update_dates(book):
 
 
 def _retrieve_metadata(vid):
-    verify = CERT_PATH
     headers = _api_headers()
     payload = {'vid': vid}
-    r = requests.get(BOOKS_API_URL, headers=headers, params=payload, verify=verify)
+    r = requests.get(BOOKS_API_URL, headers=headers, params=payload, verify=CERT_PATH)
     result = r.json().get('results')
     if result is None or len(result) == 0:
         print('Error fetching metadata for VID -', vid)
@@ -99,10 +98,9 @@ def _retrieve_metadata(vid):
 
 
 def _existing_book_for_uuid(uuid):
-    verify = CERT_PATH
     headers = _api_headers()
     try:
-        r = requests.get(f'{BOOKS_API_URL}{uuid}/', headers=headers, verify=verify)
+        r = requests.get(f'{BOOKS_API_URL}{uuid}/', headers=headers, verify=CERT_PATH)
         if r.status_code == 200 and r.headers['Content-Type'] == 'application/json':
             result = r.json()
             return result
@@ -173,7 +171,7 @@ def _create_book(book, printer):
         "pp_notes": ""
     }
     # print(payload)
-    r = requests.post(BOOKS_API_URL, headers=_api_headers(), json=payload, verify=None)
+    r = requests.post(BOOKS_API_URL, headers=_api_headers(), json=payload, verify=CERT_PATH)
     return r.json()
 
 
