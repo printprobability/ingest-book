@@ -219,34 +219,32 @@ class BookLoader:
         logging.info("Updating Characters...")
         character_run = self.get_character_run(self.characters[0]['id'])
         character_run_id = character_run['id']
-        worker_size = 20
         character_list = self.characters
-        chunks = list(self.divide_into_chunks(character_list, int(round(len(character_list) / worker_size))))
-        logging.info({"Total number of characters to be added": len(character_list)})
+        chunk_divisor = 20
+        chunks = list(self.divide_into_chunks(character_list, int(round(len(character_list) / chunk_divisor))))
+        logging.info({"Total number of characters to be updated": len(character_list)})
         logging.info({"Number of chunks for characters": len(chunks)})
         try:
-            # Run these threads in an atomic transaction
-            with concurrent.futures.ThreadPoolExecutor(max_workers=worker_size) as executor:
-                logging.info("Bulk creating characters using a threadpool executor")
+            logging.info("Updating characters in chunks")
 
-                def db_bulk_update(characters, run_id):
-                    bulk_character_response = requests.post(
-                        f"{PP_URL}/books/{self.book_id}/bulk_characters_update/",
-                        json={"characters": characters, "character_run_id": run_id},
-                        headers=AUTH_HEADER,
-                        verify=CERT_PATH,
-                    )
-                    return bulk_character_response
+            def db_bulk_update(characters_payload, run_id):
+                logging.info({"Characters updating": len(characters_payload)})
+                bulk_character_response = requests.post(
+                    f"{PP_URL}/books/{self.book_id}/bulk_characters_update/",
+                    json={"characters": characters_payload, "character_run_id": run_id},
+                    headers=AUTH_HEADER,
+                    verify=CERT_PATH,
+                )
+                return bulk_character_response
 
-                result_futures = list(map(lambda characters:
-                                          executor.submit(db_bulk_update, characters, character_run_id), chunks))
-                for future in concurrent.futures.as_completed(result_futures):
-                    try:
-                        logging.info({"Characters chunk updated", len(future.result())})
-                    except Exception as e:
-                        logging.error(f'Error in updating characters - {str(e)}')
-        except DatabaseError as ex:
-            logging.error(f"Error saving characters - {str(ex)}")
+            for characters in chunks:
+                try:
+                    response = db_bulk_update(characters, character_run_id)
+                    logging.info({"Characters chunk updated": str(response)})
+                except Exception as ex:
+                    logging.error(f'Error in updating character chunk - {str(ex)}')
+        except Exception as ex:
+            logging.error(f'Error in updating characters - {str(ex)}')
             raise
 
 
