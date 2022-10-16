@@ -19,7 +19,7 @@ JSON_OUTPUT_PATH = '/ocean/projects/hum160002p/shared/ocr_results/json_output'
 BOOKS_API_URL = 'https://printprobdb.psc.edu/api/books/'
 BOOKS_URL = 'https://printprobdb.psc.edu/books'
 CERT_PATH = '/ocean/projects/hum160002p/shared/api/incommonrsaserverca-bundle.crt'
-BULK_LOAD_JSON_SCRIPT = '/ocean/projects/hum160002p/shared/api/bulk_load_json.py'
+BULK_LOAD_JSON_SCRIPT = '/ocean/projects/hum160002p/shared/books/code/ingest-book/ingest/bulk_load_json.py'
 ESTC_LOOKUP_CSV = '/ocean/projects/hum160002p/shared/api/estc_vid_lookup.csv'
 INIT_ENV_SCRIPT = '/ocean/projects/hum160002p/shared/books/code/ingest-book/init_env.sh'
 
