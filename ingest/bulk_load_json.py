@@ -168,7 +168,7 @@ class BookLoader:
     def create_characters(self):
         character_run = self.create_character_run()
         character_run_id = character_run['id']
-        worker_size = 20
+        worker_size = 5
         book_id = self.book_id
         character_list = self.characters
         chunks = list(self.divide_into_chunks(character_list, int(round(len(character_list) / worker_size))))
@@ -187,8 +187,7 @@ class BookLoader:
                         headers=AUTH_HEADER,
                         verify=CERT_PATH,
                     )
-                    logging.info({"Character create response": bulk_character_response})
-                    return bulk_character_response.json()
+                    return bulk_character_response
 
                 result_futures = list(map(lambda characters:
                                           executor.submit(db_bulk_create, characters, character_run_id), chunks))
