@@ -187,6 +187,7 @@ class BookLoader:
                         headers=AUTH_HEADER,
                         verify=CERT_PATH,
                     )
+                    logging.info({"Character create response": bulk_character_response})
                     return bulk_character_response.json()
 
                 result_futures = list(map(lambda characters:
