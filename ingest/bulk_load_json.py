@@ -10,12 +10,10 @@ import optparse
 import re
 import concurrent.futures
 
-
 AUTH_TOKEN = open("/ocean/projects/hum160002p/shared/api/api_token.txt", "r").read().strip()
 AUTH_HEADER = {"Authorization": f"Token {AUTH_TOKEN}"}
 PP_URL = "https://printprobdb.psc.edu/api"
 CERT_PATH = "/ocean/projects/hum160002p/shared/api/incommonrsaserverca-bundle.crt"
-
 
 
 class CharacterClasses:
@@ -168,36 +166,33 @@ class BookLoader:
     def create_characters(self):
         character_run = self.create_character_run()
         character_run_id = character_run['id']
-        worker_size = 5
         book_id = self.book_id
         character_list = self.characters
-        chunks = list(self.divide_into_chunks(character_list, int(round(len(character_list) / worker_size))))
+        chunk_divisor = 20
+        chunks = list(self.divide_into_chunks(character_list, int(round(len(character_list) / chunk_divisor))))
         logging.info({"Total number of characters to be added": len(character_list)})
         logging.info({"Number of chunks for characters": len(chunks)})
         try:
-            # Run these threads in an atomic transaction
-            with concurrent.futures.ThreadPoolExecutor(max_workers=worker_size) as executor:
-                logging.info("Bulk creating characters using a threadpool executor")
+            logging.info("Creating characters in chunks")
 
-                def db_bulk_create(characters, run_id):
-                    logging.info({"Characters creating": len(characters)})
-                    bulk_character_response = requests.post(
-                        f"{PP_URL}/books/{book_id}/bulk_characters/",
-                        json={"characters": characters, "character_run_id": run_id},
-                        headers=AUTH_HEADER,
-                        verify=CERT_PATH,
-                    )
-                    return bulk_character_response
+            def db_bulk_create(characters_payload, run_id):
+                logging.info({"Characters creating": len(characters_payload)})
+                bulk_character_response = requests.post(
+                    f"{PP_URL}/books/{book_id}/bulk_characters/",
+                    json={"characters": characters_payload, "character_run_id": run_id},
+                    headers=AUTH_HEADER,
+                    verify=CERT_PATH,
+                )
+                return bulk_character_response
 
-                result_futures = list(map(lambda characters:
-                                          executor.submit(db_bulk_create, characters, character_run_id), chunks))
-                for future in concurrent.futures.as_completed(result_futures):
-                    try:
-                        logging.info({"Characters chunk created", future.result()})
-                    except Exception as e:
-                        logging.error(f'Error in creating characters - {str(e)}')
+            for characters in chunks:
+                try:
+                    response = db_bulk_create(characters, character_run_id)
+                    logging.info({"Characters chunk created": str(response)})
+                except Exception as ex:
+                    logging.error(f'Error in creating character chunk - {str(ex)}')
         except Exception as ex:
-            logging.error(f"Error saving characters - {str(ex)}")
+            logging.error(f'Error in creating characters - {str(ex)}')
             raise
 
     def update_pages(self):
@@ -256,7 +251,6 @@ class BookLoader:
 
 
 def main():
-
     logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
 
     # Options and arguments
