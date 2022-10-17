@@ -217,8 +217,6 @@ class BookLoader:
 
     def update_characters(self):
         logging.info("Updating Characters...")
-        character_run = self.get_character_run(self.characters[0]['id'])
-        character_run_id = character_run['id']
         character_list = self.characters
         chunk_divisor = 20
         chunks = list(self.divide_into_chunks(character_list, int(round(len(character_list) / chunk_divisor))))
@@ -227,11 +225,11 @@ class BookLoader:
         try:
             logging.info("Updating characters in chunks")
 
-            def db_bulk_update(characters_payload, run_id):
+            def db_bulk_update(characters_payload):
                 logging.info({"Characters updating": len(characters_payload)})
                 bulk_character_response = requests.post(
                     f"{PP_URL}/books/{self.book_id}/bulk_characters_update/",
-                    json={"characters": characters_payload, "character_run_id": run_id},
+                    json={"characters": characters_payload},
                     headers=AUTH_HEADER,
                     verify=CERT_PATH,
                 )
@@ -239,7 +237,7 @@ class BookLoader:
 
             for characters in chunks:
                 try:
-                    response = db_bulk_update(characters, character_run_id)
+                    response = db_bulk_update(characters)
                     logging.info({"Characters chunk updated": str(response)})
                 except Exception as ex:
                     logging.error(f'Error in updating character chunk - {str(ex)}')
