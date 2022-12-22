@@ -10,7 +10,7 @@ import datetime
 import requests
 import subprocess
 from .sheets.sheet import get_full_printer_name_for_short_name, \
-    update_uuid_in_sheet_for_estc_number, get_uuid_for_book_string_from_sheet
+    update_uuid_in_sheet_for_book_string, get_uuid_for_book_string_from_sheet
 from .estc_search.estc import est_info_for_number
 from .util import confirm
 
@@ -22,6 +22,7 @@ CERT_PATH = '/ocean/projects/hum160002p/shared/api/incommonrsaserverca-bundle.cr
 BULK_LOAD_JSON_SCRIPT = '/ocean/projects/hum160002p/shared/books/code/ingest-book/ingest/bulk_load_json.py'
 ESTC_LOOKUP_CSV = '/ocean/projects/hum160002p/shared/api/estc_vid_lookup.csv'
 INIT_ENV_SCRIPT = '/ocean/projects/hum160002p/shared/books/code/ingest-book/init_env.sh'
+ESTC_VALUES_WITH_MULTIPLE_BOOKS = ['S111228']
 
 
 def _year_from_imprint_value(imprint_value):
@@ -271,11 +272,12 @@ def run_command(book_string, preexisting_uuid, printer, update):
             print(f'Existing book for UUID - {preexisting_uuid} has no runs yet.')
     else:
         target_book = None
-        existing_books = _existing_books_for_estc(estc_no)
-        if existing_books is not None:
-            non_eebo_existing_book = _exactly_one_non_eebo_book(existing_books)
-            if non_eebo_existing_book is not None:
-                target_book = non_eebo_existing_book
+        if estc_no not in ESTC_VALUES_WITH_MULTIPLE_BOOKS:
+            existing_books = _existing_books_for_estc(estc_no)
+            if existing_books is not None:
+                non_eebo_existing_book = _exactly_one_non_eebo_book(existing_books)
+                if non_eebo_existing_book is not None:
+                    target_book = non_eebo_existing_book
 
         if target_book is not None:
             book_uuid = target_book['id']
@@ -304,8 +306,8 @@ def run_command(book_string, preexisting_uuid, printer, update):
             # Update the book UUID in the Google sheet
             print("Book created with UUID: ", book_uuid)
 
-    print("Updating UUID in Google sheet for ESTC number", estc_no, book_uuid)
-    update_uuid_in_sheet_for_estc_number(estc_no, book_uuid)
+    print("Updating UUID in Google sheet for book string", book_string, book_uuid)
+    update_uuid_in_sheet_for_book_string(book_string, book_uuid)
     if update:
         print('Updating/overwriting an existing run for book with UUID: ', book_uuid)
     else:
