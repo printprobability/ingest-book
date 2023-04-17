@@ -218,7 +218,8 @@ def _create_new_book_with_data(book_metadata, printer=None):
 
 # Create the batch command to ingest the book
 def _create_bash_command(book_uuid, folder_name, update=False):
-    batch_command_prefix = 'sbatch -c 10 --mem-per-cpu=1999mb -p "RM-shared" -t 48:00:00'
+    batch_command_prefix = 'sbatch --dependency=singleton --job-name=IngestBookJob -c 10 --mem-per-cpu=1999mb ' \
+                           '-p "RM-shared" -t 48:00:00'
     activate_virtual_env = 'source ~/.bashrc; source {init_env_script}'.format(init_env_script=INIT_ENV_SCRIPT)
     update_option = '-u' if update else ''
     command_to_run = 'python3 {BULK_LOAD_JSON_SCRIPT} {update_option} -b {book_uuid} ' \
