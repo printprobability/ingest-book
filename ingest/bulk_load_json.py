@@ -13,7 +13,7 @@ import concurrent.futures
 AUTH_TOKEN = open("/ocean/projects/hum160002p/shared/api/api_token.txt", "r").read().strip()
 AUTH_HEADER = {"Authorization": f"Token {AUTH_TOKEN}"}
 PP_URL = "https://printprobdb.psc.edu/api"
-CERT_PATH = "/ocean/projects/hum160002p/shared/api/incommonrsaserverca-bundle.crt"
+CERT_PATH = "/ocean/projects/hum160002p/shared/api/server.crt"
 
 
 class CharacterClasses:
